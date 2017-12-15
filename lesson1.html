@@ -1,4 +1,7 @@
 <html>
+<!-- based on openGL tutorial here: https://learnopengl.com/#!Getting-started/Hello-Window -->
+<!-- based on webGL tutorial here: http://learningwebgl.com/blog/?p=28 -->
+<!-- based on quick reference card here: https://www.khronos.org/files/webgl/webgl-reference-card-1_0.pdf -->
 <script type="text/javascript">
 
     var gl;
@@ -10,7 +13,7 @@
         } catch (e) {
         }
         if (!gl) {
-            alert("Could not initialise WebGL, sorry :-(");
+            alert("Could not initialise WebGL, sorry :(");
         }
     }
 
@@ -36,6 +39,12 @@
             alert("Done");
             clearTimeout(ticker);
         }
+
+        // clear the background by 
+        // setting the color (state-setting)
+        // clearing the buffer (state-using)
+        gl.clearColor(0.2,0.3,0.3,1.0); // R G B A
+        gl.clear(gl.COLOR_BUFFER_BIT);
 
     }
 
