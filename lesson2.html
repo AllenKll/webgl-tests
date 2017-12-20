@@ -1,0 +1,229 @@
+<html>
+<!-- based on openGL tutorial here: https://learnopengl.com/#!Getting-started/Hello-Window -->
+<!-- based on webGL tutorial here: http://learningwebgl.com/blog/?p=28 -->
+<!-- based on quick reference card here: https://www.khronos.org/files/webgl/webgl-reference-card-1_0.pdf -->
+<!-- MOAR LINKS: 
+    https://webglfundamentals.org/webgl/lessons/webgl-fundamentals.html 
+    https://webglfundamentals.org/webgl/lessons/webgl-shaders-and-glsl.html
+-->
+<script type="text/javascript">
+
+    // *********************************************
+    // main program entry point
+    // *********************************************
+    var ticker;
+    function startTheProgram() {
+        // setup the input handling functions
+        document.onkeydown = handleKeyDown;
+        document.onkeyup = handleKeyUp;
+
+        // setup system tick
+        ticker = setInterval(tick, 20);
+
+        // Setup the canvas/gl variable
+        var canvas = document.getElementById("theCanvas");
+        initGL(canvas);
+
+        // init the webGL shaders and compile the program
+        initShaders();
+
+        // init the webGL buffers
+        initBuffers();
+
+        // draw the scene
+        drawScene();
+    }
+
+    // *********************************************
+    // Setup the canvas/gl variable
+    // *********************************************
+    var gl;
+    function initGL(canvas) {
+        try {
+            gl = canvas.getContext("experimental-webgl");
+            // non GL items for usefullness
+            gl.viewportWidth = canvas.width;
+            gl.viewportHeight = canvas.height;
+        } catch (e) { }
+        
+        if (!gl)
+            alert("Could not initialise WebGL, sorry :(");
+    }
+
+    // *********************************************
+    // pretty self explanatory... "somehow" get some shaders, and add them to the program.
+    // then tell the context to use that program
+    // *********************************************
+    var shaderProgram;
+    function initShaders() {
+        var fragmentShader = getShader(gl, "shader-fs");
+        var vertexShader = getShader(gl, "shader-vs");
+
+        shaderProgram = gl.createProgram();
+        gl.attachShader(shaderProgram, vertexShader);
+        gl.attachShader(shaderProgram, fragmentShader);
+        gl.linkProgram(shaderProgram);
+        gl.useProgram(shaderProgram);
+
+        if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) 
+          alert("Could not initialise shaders");
+    }
+
+    // *********************************************
+    // This will pull the shader source code from the tag that has the id
+    // that matches to param.  Then pass the text to the WebGL shader
+    // compiler, then return the compiled shader.
+    // *********************************************
+    function getShader(gl, id) {
+        var shaderScript = document.getElementById(id);
+        if (!shaderScript) {
+          return null;
+        }
+
+        var str = "";
+        var k = shaderScript.firstChild;
+        while (k) {
+          if (k.nodeType == 3)
+              str += k.textContent;
+          k = k.nextSibling;
+        }
+
+        var shader;
+        if (shaderScript.type == "x-shader/x-fragment") {
+          shader = gl.createShader(gl.FRAGMENT_SHADER);
+        } else if (shaderScript.type == "x-shader/x-vertex") {
+          shader = gl.createShader(gl.VERTEX_SHADER);
+        } else {
+          return null;
+        }
+
+        gl.shaderSource(shader, str);
+        gl.compileShader(shader);
+
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+          alert(gl.getShaderInfoLog(shader));
+          return null;
+        }
+
+        return shader;
+    }
+
+    // *********************************************
+    // create, enable and attache the buffers to the program
+    // *********************************************
+    var triangleVertexPositionBuffer;
+    var offsetLocBuffer;
+    function initBuffers() {
+        // create the buffer -> allocates memory in the graphics card/shared ram  The retun is a "pointer" to it.
+        triangleVertexPositionBuffer = gl.createBuffer();
+        // non-open/web GL here... just store some extra info about the data
+        triangleVertexPositionBuffer.itemSize = 3;
+        triangleVertexPositionBuffer.numItems = 3;
+        triangleVertexPositionBuffer.myNameIs = "Bob";
+
+        // set the state to operate on this buffer whenever we operate on the "ARRAY_BUFFER"
+        gl.bindBuffer(gl.ARRAY_BUFFER, triangleVertexPositionBuffer);
+        // stuff the buffer with the data, indicating that it will rarely if every change.
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(myTriangleVx), gl.STATIC_DRAW);
+
+        // get the position buffer for the triangle (based on the shader's requirement)
+        var triangleAttributeLocation = gl.getAttribLocation(shaderProgram, "aVertexPosition");
+
+        // enable the buffer
+        gl.enableVertexAttribArray(triangleAttributeLocation);
+
+        // Assign the buffer to the location 
+        // the secret is that this binds to the current array_buffer attribute (triangleVertexPositionBuffer)
+        gl.vertexAttribPointer(triangleAttributeLocation, triangleVertexPositionBuffer.itemSize, gl.FLOAT, false, 0, 0);
+
+
+        // location buffer
+        //var offsetLocBuffer = gl.getUniformLocation(someProgram, "u_offset");
+
+    }
+
+    // my triangle has three vertices, each (x,y,z)
+    // these are normalized ( between -1 and 1)
+    // but they dont' have to be until they leave the vertex shader.
+    var myTriangleVx = [
+        -0.5, -0.5, 0, 
+         0.5, -0.5, 0, 
+           0,  0.5, 0,            
+    ];
+    // information about my triangle
+    var translation = [0, 0];
+    var scaling = [1.0, 1.0];
+    var color = [Math.random(), Math.random(), Math.random(), 1.0];
+
+
+    function drawScene() {
+        gl.viewport(0, 0, gl.viewportWidth, gl.viewportHeight);  // remember we set these non openGL items in Init?
+
+        // clear the background by 
+        // setting the color (state-setting)
+        // clearing the buffers (state-using)
+        gl.clearColor(0.2,0.3,0.3,1.0); // R G B A
+        gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+
+        gl.drawArrays(gl.TRIANGLES, 0, triangleVertexPositionBuffer.numItems);
+    }
+
+    // ***********************************
+    // SYSTEM TICK HANDLER
+    // ***********************************
+    var keepGoing = true;
+    function tick(){
+        handleInput();
+        if ( keepGoing == false )
+        {
+            alert("Done");
+            clearTimeout(ticker);
+        }
+    }
+
+    // ***********************************
+    // INPUT HADNLERS
+    // ***********************************
+    var currentlyPressedKeys = {};
+    function handleKeyDown(event) {
+        currentlyPressedKeys[event.keyCode] = true;
+    }
+
+    function handleKeyUp(event) {
+        currentlyPressedKeys[event.keyCode] = false;
+    }
+
+    function handleInput() {
+        if ( currentlyPressedKeys[27] == true) // escape key 
+        {
+            keepGoing = false
+        }
+    }
+
+</script>
+
+<!-- simple fragment shader 
+    A fragment shader's job is to determine the color for the pixel being rasterized -->
+<script id="shader-fs" type="x-shader/x-fragment">
+  precision mediump float;
+
+  void main(void) {
+    gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);
+  }
+</script>
+
+<!-- simple Vertex Shader - 
+     A Vertex Shader's job is to generate clipspace coordinates. -->
+<script id="shader-vs" type="x-shader/x-vertex">
+  attribute vec4 aVertexPosition;
+
+  void main(void) {
+    //gl_Position = uPMatrix * uMVMatrix * vec4(aVertexPosition, 1.0);
+    gl_Position = aVertexPosition;
+  }
+</script>     
+
+<body onload="startTheProgram();">
+  <canvas id="theCanvas" style="border: none;" width="500" height="500"></canvas>
+</body>
+</html>
